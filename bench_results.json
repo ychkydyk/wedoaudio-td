@@ -1,0 +1,200 @@
+[
+ {
+  "style": "four-on-floor",
+  "sr": 44100,
+  "bits": 32,
+  "kick_p": 0.8888888888888888,
+  "kick_r": 0.9411764705882353,
+  "kick_f": 0.9142857142857143,
+  "snare_f": 1.0,
+  "bpm_est": 128.57142857142856,
+  "bpm_true": 128.0
+ },
+ {
+  "style": "four-on-floor",
+  "sr": 48000,
+  "bits": 32,
+  "kick_p": 0.8,
+  "kick_r": 0.9411764705882353,
+  "kick_f": 0.8648648648648648,
+  "snare_f": 1.0,
+  "bpm_est": 128.57142857142856,
+  "bpm_true": 128.0
+ },
+ {
+  "style": "four-on-floor",
+  "sr": 44100,
+  "bits": 16,
+  "kick_p": 0.8888888888888888,
+  "kick_r": 0.9411764705882353,
+  "kick_f": 0.9142857142857143,
+  "snare_f": 1.0,
+  "bpm_est": 128.57142857142856,
+  "bpm_true": 128.0
+ },
+ {
+  "style": "breakbeat-dnb",
+  "sr": 44100,
+  "bits": 32,
+  "kick_p": 1.0,
+  "kick_r": 1.0,
+  "kick_f": 1.0,
+  "snare_f": 1.0,
+  "bpm_est": 87.80487804878048,
+  "bpm_true": 174.0
+ },
+ {
+  "style": "breakbeat-dnb",
+  "sr": 48000,
+  "bits": 32,
+  "kick_p": 1.0,
+  "kick_r": 1.0,
+  "kick_f": 1.0,
+  "snare_f": 1.0,
+  "bpm_est": 87.80487804878048,
+  "bpm_true": 174.0
+ },
+ {
+  "style": "breakbeat-dnb",
+  "sr": 44100,
+  "bits": 16,
+  "kick_p": 1.0,
+  "kick_r": 1.0,
+  "kick_f": 1.0,
+  "snare_f": 1.0,
+  "bpm_est": 87.80487804878048,
+  "bpm_true": 174.0
+ },
+ {
+  "style": "halftime",
+  "sr": 44100,
+  "bits": 32,
+  "kick_p": 1.0,
+  "kick_r": 0.8,
+  "kick_f": 0.888888888888889,
+  "snare_f": 1.0,
+  "bpm_est": 70.58823529411765,
+  "bpm_true": 70.0
+ },
+ {
+  "style": "halftime",
+  "sr": 48000,
+  "bits": 32,
+  "kick_p": 1.0,
+  "kick_r": 0.8,
+  "kick_f": 0.888888888888889,
+  "snare_f": 1.0,
+  "bpm_est": 70.58823529411765,
+  "bpm_true": 70.0
+ },
+ {
+  "style": "halftime",
+  "sr": 44100,
+  "bits": 16,
+  "kick_p": 1.0,
+  "kick_r": 0.8,
+  "kick_f": 0.888888888888889,
+  "snare_f": 1.0,
+  "bpm_est": 70.58823529411765,
+  "bpm_true": 70.0
+ },
+ {
+  "style": "waltz",
+  "sr": 44100,
+  "bits": 32,
+  "kick_p": 1.0,
+  "kick_r": 0.8571428571428571,
+  "kick_f": 0.923076923076923,
+  "snare_f": 1.0,
+  "bpm_est": 150.0,
+  "bpm_true": 150.0
+ },
+ {
+  "style": "waltz",
+  "sr": 48000,
+  "bits": 32,
+  "kick_p": 1.0,
+  "kick_r": 0.8571428571428571,
+  "kick_f": 0.923076923076923,
+  "snare_f": 1.0,
+  "bpm_est": 150.0,
+  "bpm_true": 150.0
+ },
+ {
+  "style": "waltz",
+  "sr": 44100,
+  "bits": 16,
+  "kick_p": 1.0,
+  "kick_r": 0.8571428571428571,
+  "kick_f": 0.923076923076923,
+  "snare_f": 1.0,
+  "bpm_est": 150.0,
+  "bpm_true": 150.0
+ },
+ {
+  "style": "ambient-nobeat",
+  "sr": 44100,
+  "bits": 32,
+  "kick_p": 1.0,
+  "kick_r": 1.0,
+  "kick_f": 1.0,
+  "snare_f": 1.0,
+  "bpm_est": 138.46153846153845,
+  "bpm_true": 0.0
+ },
+ {
+  "style": "ambient-nobeat",
+  "sr": 48000,
+  "bits": 32,
+  "kick_p": 1.0,
+  "kick_r": 1.0,
+  "kick_f": 1.0,
+  "snare_f": 1.0,
+  "bpm_est": 120.839808,
+  "bpm_true": 0.0
+ },
+ {
+  "style": "ambient-nobeat",
+  "sr": 44100,
+  "bits": 16,
+  "kick_p": 1.0,
+  "kick_r": 1.0,
+  "kick_f": 1.0,
+  "snare_f": 1.0,
+  "bpm_est": 138.46153846153845,
+  "bpm_true": 0.0
+ },
+ {
+  "style": "clipped-loud",
+  "sr": 44100,
+  "bits": 32,
+  "kick_p": 1.0,
+  "kick_r": 1.0,
+  "kick_f": 1.0,
+  "snare_f": 1.0,
+  "bpm_est": 128.57142857142856,
+  "bpm_true": 128.0
+ },
+ {
+  "style": "clipped-loud",
+  "sr": 48000,
+  "bits": 32,
+  "kick_p": 1.0,
+  "kick_r": 0.9411764705882353,
+  "kick_f": 0.9696969696969697,
+  "snare_f": 1.0,
+  "bpm_est": 128.57142857142856,
+  "bpm_true": 128.0
+ },
+ {
+  "style": "clipped-loud",
+  "sr": 44100,
+  "bits": 16,
+  "kick_p": 1.0,
+  "kick_r": 1.0,
+  "kick_f": 1.0,
+  "snare_f": 1.0,
+  "bpm_est": 128.57142857142856,
+  "bpm_true": 128.0
+ }
+]

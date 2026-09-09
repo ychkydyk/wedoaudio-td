@@ -1,0 +1,6 @@
+# Runtime inside TouchDesigner needs nothing but numpy, which TD already ships.
+# These are only for the test benches.
+numpy>=1.24
+librosa>=0.10      # _wedoaudio_realtest.py and _wedoaudio_libtest.py only
+soundfile>=0.12    # librosa's audio backend
+# ffmpeg is also needed by _wedoaudio_realtest.py (container test) — install separately
