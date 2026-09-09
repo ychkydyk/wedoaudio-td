@@ -31,7 +31,7 @@ python src/_wedoaudio_libtest.py "D:/ваши/сэмплы"   # размечен
 
 ## Как прислать
 
-Pull request или issue на [github.com/ychkydyk/wedoaudio](https://github.com/ychkydyk/wedoaudio). В PR приложите вывод трёх команд выше до и после вашей правки — этого достаточно, отдельного описания не нужно.
+Pull request или issue на [github.com/ychkydyk/wedoaudio-td](https://github.com/ychkydyk/wedoaudio-td). В PR приложите вывод трёх команд выше до и после вашей правки — этого достаточно, отдельного описания не нужно.
 
 ## Правила, чтобы не было сюрпризов
 

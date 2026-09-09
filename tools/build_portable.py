@@ -307,7 +307,7 @@ AGENTS = """# WEDOAUDIO 4.2.1
 - не ставить параметрам умолчание 0, если рабочее значение не ноль:
   ядро получает ключ явно, и запасное значение `c.get(k, 40)` уже не спасает.
 
-Лицензия CC BY-NC · github.com/ychkydyk/wedoaudio
+Лицензия CC BY-NC · github.com/ychkydyk/wedoaudio-td
 """
 
 
