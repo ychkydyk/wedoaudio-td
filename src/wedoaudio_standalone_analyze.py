@@ -1,3 +1,5 @@
+# LEGACY 4.2 wrapper, retained for history. The current portable component is built
+# from ANALYZE in tools/build_portable.py. Do not wire this file into the 4.2.2 node.
 # WEDOAUDIO standalone analyzer — Execute DAT (onFrameStart) embedded INSIDE the
 # WEDOAUDIO .tox. Self-contained: reads the component's own audio_in + spectrum_raw,
 # runs the embedded wedoaudio_dsp module, stores the feature dict on the component
