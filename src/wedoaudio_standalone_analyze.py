@@ -58,14 +58,25 @@ def onFrameStart(frame):
         if ain and ain.numSamples:
             a = np.asarray(ain.numpyArray()[0], dtype=float)
             rms = float(np.sqrt((a * a).mean()))
-        t = absTime.frame / 60.0
+        # ВРЕМЯ БЕРЁТСЯ У ЧАСОВ, А НЕ У НОМЕРА КАДРА.
+        # Было: absTime.frame / 60.0 — номер кадра, поделённый на заявленные
+        # шестьдесят, то есть не отсчёт, а намерение; и два запаса по 1/30 на
+        # первый кадр и на разрыв. Разность двух показаний надёжна только на
+        # замкнутом промежутке: на первом кадре вычитать нечего, и подстановка
+        # выдавала правдоподобное число там, где измерения нет вовсе. Теперь
+        # третье состояние — кадр пропускается, признаки не обновляются.
+        t = absTime.seconds
         last = _S['last_t']
-        dt = (t - last) if last >= 0 else (1.0 / 30.0)
-        if dt <= 0 or dt > 0.5:
-            dt = 1.0 / 30.0
         _S['last_t'] = t
+        dt = (t - last) if last >= 0 else -1.0
+        if dt <= 0 or dt > 0.5:
+            comp.store('wedo_status', 'интервал не измерен — первый кадр или разрыв')
+            return
         feat = _S['wa'].process(mag, rms, t, dt, cfg=_cfg(comp))
         feat['spectrum'] = _log128(arr)
         comp.store('wedo', feat)
-    except Exception:
-        pass
+        comp.store('wedo_status', 'работает')
+    except Exception as e:
+        # Молчаливый отказ — худшее из возможного: анализ перестаёт считать, а
+        # снаружи это выглядит как тишина на входе. Ошибка должна быть видна.
+        comp.store('wedo_status', 'ошибка: %s' % e)
