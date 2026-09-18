@@ -30,6 +30,23 @@ generated, not copied, and measured against 64x spectral reconstruction: worst u
 0.05…0.45 fs. The result does not depend on how samples are cut into blocks (difference 0.0).
 The meter is **not certified**; passing these signals is a check, not an attestation.
 
+## Reference comparison on real music
+
+One private 35:50 stereo master (48 kHz, 24 bit) was measured in full by this meter and by the `ebur128`
+filter of ffmpeg, an independent implementation:
+
+| | ffmpeg `ebur128` | WEDOAUDIO |
+|---|---|---|
+| integrated | -11.6 LUFS | -11.56 LUFS |
+| loudness range | 12.1 LU | 12.15 LU |
+| true peak | +1.6 dBFS | +1.66 dBTP |
+
+ffmpeg prints one decimal, so agreement is to its resolution. One file is one file: this shows the two
+implementations agree on real programme material, not that either is certified. The audio is not
+distributed. The same master, played through a full show rig in TouchDesigner 2025.32460 next to that
+rig's own analyzer, gave a matching tempo (145.84 vs 145.85 BPM), no sample-loss note, Selftest
+`(True, [])`, and a measured loudness cost of 0.39 ms per frame in that rig's Python (worst frame 0.71 ms).
+
 ## Native acceptance
 
 `tools/native_acceptance.py`, run inside TouchDesigner. It loads the written `.tox` into a clean container
@@ -90,4 +107,4 @@ rule; it is recorded rather than changed silently, because consumers may divide 
 Loudness is verified for mono and stereo only (the first two input channels are used); 5.1 weighting is not
 claimed. The integrated value covers the last two hours. Timbre/key/MFCC source is available but is not
 embedded in the portable component. Instrument separation is not included. Only the 2025.32460 build was
-checked. No real-music loudness comparison against a reference meter has been made yet.
+checked. The reference comparison covers a single recording.

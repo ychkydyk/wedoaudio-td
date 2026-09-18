@@ -172,6 +172,7 @@ CHOP обязано стоять число, поэтому там `−100`; и�
 | `src/_wedoaudio_timbre_test.py` | синтетика | 14 из 14 |
 | `src/_wedoaudio_loudness_test.py` | эталонные сигналы EBU Tech 3341 / 3342 | 34 из 34 |
 | `tools/native_acceptance.py` | собранный `.tox` внутри TouchDesigner 2025.32460 | см. `native_acceptance.json` |
+| сверка с `ebur128` из ffmpeg | приватный мастер 35:50, 48 кГц | I −11.56 против −11.6 LUFS · LRA 12.15 против 12.1 LU · пик +1.66 против +1.6 |
 | `src/_wedoaudio_bench.py` | 6 стилей × 3 формата, конвейер 60 к/с | кики 18/18, снейры 18/18, темп 12/15 |
 | `src/_wedoaudio_realtest.py` | точная разметка, чужая музыка, 7 контейнеров | 6/6 · 4/4 · 6/6, дрейф 0.0% |
 | `src/_wedoaudio_libtest.py` | размеченная библиотека лупов | темп 12/32, рядом librosa 13/32 |
