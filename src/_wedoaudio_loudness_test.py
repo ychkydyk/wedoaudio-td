@@ -233,6 +233,31 @@ m.reset()
 o = m.read()
 check("reset clears every reading", all(v is None for v in o.values()), str({k: fmt(v) for k, v in o.items()}))
 
+# Found in TouchDesigner, not offline: a meter that STARTS in the middle of a steady
+# tone (a reset on a track boundary) must not read its own start as an onset. With a
+# zero-filled interpolator history a steady -23 dBFS sine read -22.93 dBTP after reset.
+worst = 0.0
+steady = tone(sr, 1.0, -23.0)
+for start in range(0, 48, 3):                       # every phase of the 1 kHz cycle
+    m = LoudnessMeter(sr, 2, truepeak=True)
+    o = m.process(steady[:, start:start + 4800])
+    worst = max(worst, o["truepeak_max"] + 23.0)
+check("a meter started mid-tone invents no peak", worst < 0.02, f"worst over-read {worst:+.3f} dB")
+check("readings are plain floats or None", all(v is None or type(v) is float for v in o.values()),
+      str({k: type(v).__name__ for k, v in o.items()}))
+
+# A two-hour set: the history is a ring, and the fast gate must agree with the plain one.
+from wedoaudio_loudness import MAX_BLOCKS, REL_GATE
+m = LoudnessMeter(sr, 2)
+hist = np.random.default_rng(7).uniform(1e-8, 1e-2, MAX_BLOCKS + 500)
+for v in hist:
+    m._blocks.push(v)
+z = m._blocks.view()
+check("history is capped at two hours and keeps the newest block",
+      z.size == MAX_BLOCKS and hist[-1] in z and hist[0] not in z, f"{z.size} blocks")
+d = abs(m._gate(z, REL_GATE)[0] - m._gated_mean(z, REL_GATE))
+check("fast gating equals plain gating on a full history", d < 1e-9, f"difference {d:.1e} LU")
+
 try:
     LoudnessMeter(sr, 2).process(np.zeros((3, 100)))
     check("wrong channel count is refused", False)

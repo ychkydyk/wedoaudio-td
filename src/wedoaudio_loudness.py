@@ -142,26 +142,56 @@ class _TruePeak:
     def __init__(self, sr, channels=1):
         self.P = tp_phases(_tp_factor(sr))[:, ::-1].T.copy()     # (taps, factor)
         self.L = self.P.shape[0]
-        self.hist = np.zeros((int(channels), self.L - 1))
+        self.channels = int(channels)
+        self.reset()
 
     def reset(self):
-        self.hist[:] = 0.0
+        # History starts EMPTY, not zero-filled. Zeros tell the interpolator that the
+        # signal began abruptly at the first sample, and an abrupt onset genuinely
+        # overshoots (Gibbs, up to about +0.7 dB). That onset belongs to the meter, not
+        # to the signal. Measured in TouchDesigner: a steady -23 dBFS sine read
+        # -22.93 dBTP right after a reset. Until a full window of real samples has
+        # arrived there is nothing to interpolate, so nothing is interpolated.
+        self.hist = np.zeros((self.channels, 0))
 
     def process(self, x):
         """x: (channels, n) -> peak of the oversampled block over all channels, linear."""
         if x.shape[1] == 0:
             return 0.0
+        # A true peak is never below the sample peak, so the samples themselves are a
+        # floor. This also covers the first half-window, which has no interpolated value.
+        pk = float(np.abs(x).max())
         buf = np.concatenate((self.hist, x), axis=1)
+        if buf.shape[1] < self.L:
+            self.hist = buf
+            return pk
         win = np.lib.stride_tricks.sliding_window_view(buf, self.L, axis=1)   # (C, n, taps)
-        pk = float(np.abs(win @ self.P).max())
+        pk = max(pk, float(np.abs(win @ self.P).max()))
         self.hist = buf[:, -(self.L - 1):]
         return pk
 
 
 # ----- meter ------------------------------------------------------------------------
 
+class _Ring:
+    """Fixed-size store for values whose order does not matter. Once full, the oldest
+    value is overwritten: the integrated reading then covers the last two hours."""
+
+    def __init__(self, size):
+        self.a = np.zeros(int(size))
+        self.n = 0
+
+    def push(self, v):
+        self.a[self.n % self.a.size] = v
+        self.n += 1
+
+    def view(self):
+        return self.a[:min(self.n, self.a.size)]
+
+
 def _lufs(power):
-    return LUFS_OFFSET + 10.0 * np.log10(power) if power > 0.0 else None
+    # plain float, not np.float64: the reading goes out through a public API
+    return float(LUFS_OFFSET + 10.0 * np.log10(power)) if power > 0.0 else None
 
 
 class LoudnessMeter:
@@ -193,8 +223,12 @@ class LoudnessMeter:
         self._acc = 0.0                 # weighted sum of squares in the open 100 ms slot
         self._acc_n = 0
         self._sub = []                  # closed 100 ms slots, mean square (last 30 kept)
-        self._blocks = []               # 400 ms gating blocks, hop 100 ms
-        self._st = []                   # short-term powers, hop 1 s (for LRA)
+        # Gating history lives in fixed numpy rings, not in lists. Gating and the
+        # range percentiles ignore order, so a ring loses nothing - and a list of
+        # 72 000 floats had to be converted to an array on every 100 ms slot, which
+        # measured as a 3.5-4.9 ms spike ten times a second two hours into a set.
+        self._blocks = _Ring(MAX_BLOCKS)        # 400 ms gating blocks, hop 100 ms
+        self._st = _Ring(MAX_BLOCKS // 10)      # short-term powers, hop 1 s (for LRA)
         self._sub_count = 0
         self._tp_max = 0.0
         self._tp_recent = []            # per-slot peaks, last 4 -> 400 ms window
@@ -249,14 +283,10 @@ class LoudnessMeter:
             del self._tp_recent[0]
         self._tp_slot = 0.0
         if len(self._sub) >= 4:
-            self._blocks.append(sum(self._sub[-4:]) / 4.0)
-            if len(self._blocks) > MAX_BLOCKS:
-                del self._blocks[0]
-            self._integrated = self._gate(self._blocks, REL_GATE)[0]
+            self._blocks.push(sum(self._sub[-4:]) / 4.0)
+            self._integrated = self._gated_mean(self._blocks.view(), REL_GATE)
         if len(self._sub) >= 30 and (self._sub_count - 30) % 10 == 0:
-            self._st.append(sum(self._sub) / 30.0)
-            if len(self._st) > MAX_BLOCKS // 10:
-                del self._st[0]
+            self._st.push(sum(self._sub) / 30.0)
             self._lra = self._range()
 
     # -- gating ----------------------------------------------------------------------
@@ -275,8 +305,27 @@ class LoudnessMeter:
             return None, zr
         return _lufs(float(zr.mean())), zr
 
+    @staticmethod
+    def _gated_mean(z, rel):
+        """Same two gates as _gate, value only. Masked sums instead of boolean
+        indexing: no copies of a two-hour history ten times a second (0.89 -> 0.28 ms
+        on 72 000 blocks, result identical to 1e-17)."""
+        if z.size == 0:
+            return None
+        abs_thr = 10.0 ** ((ABS_GATE - LUFS_OFFSET) / 10.0)
+        ma = z > abs_thr
+        na = int(np.count_nonzero(ma))
+        if na == 0:
+            return None
+        rel_thr = float(z.sum(where=ma)) / na * 10.0 ** (rel / 10.0)
+        mr = z > max(rel_thr, abs_thr)
+        nr = int(np.count_nonzero(mr))
+        if nr == 0:
+            return None
+        return _lufs(float(z.sum(where=mr)) / nr)
+
     def _range(self):
-        _, z = self._gate(self._st, LRA_REL_GATE)
+        _, z = self._gate(self._st.view(), LRA_REL_GATE)
         if z.size < 2:
             return None
         l = np.sort(LUFS_OFFSET + 10.0 * np.log10(z))
@@ -294,6 +343,6 @@ class LoudnessMeter:
             "shortterm": s,
             "integrated": self._integrated,
             "lra": self._lra,
-            "truepeak": (20.0 * np.log10(tp_now) if tp_now > 0.0 else None) if self._tp else None,
-            "truepeak_max": (20.0 * np.log10(self._tp_max) if self._tp_max > 0.0 else None) if self._tp else None,
+            "truepeak": (float(20.0 * np.log10(tp_now)) if tp_now > 0.0 else None) if self._tp else None,
+            "truepeak_max": (float(20.0 * np.log10(self._tp_max)) if self._tp_max > 0.0 else None) if self._tp else None,
         }

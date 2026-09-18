@@ -9,7 +9,7 @@
     exec(open(r'C:/путь/к/wedoaudio/tools/build_portable.py', encoding='utf-8').read())
 
 Что получится: /project1/WEDOAUDIO_build/WEDOAUDIO — самодостаточный компонент,
-и рядом файл WEDOAUDIO_4.2.1_portable.tox.
+и рядом файл WEDOAUDIO_<версия>_TD<сборка>.tox.
 
 ПРАВИЛА ПЕРЕНОСИМОСТИ, которым следует сборка:
   · ни одного абсолютного пути наружу — только входы и параметры;
@@ -44,6 +44,7 @@ if not REPO or not os.path.isdir(os.path.join(REPO, "src")):
     raise SystemExit("не найден репозиторий: задайте WEDOAUDIO_REPO")
 
 CORE = open(os.path.join(REPO, "src", "wedoaudio_dsp.py"), encoding="utf-8").read()
+LOUD = open(os.path.join(REPO, "src", "wedoaudio_loudness.py"), encoding="utf-8").read()
 
 # --------------------------------------------------------------------------- расширение
 EXT = '''
@@ -55,6 +56,8 @@ class Wedoaudio:
         self.comp = ownerComp
         self._core = None
         self._sr = 0.0
+        self._loud = None
+        self._loud_key = None
         self.Version = "4.3.0"
         self.Status = "ожидание звука"
 
@@ -74,6 +77,7 @@ class Wedoaudio:
         """Сбросить состояние анализатора. Вызывать при смене источника."""
         self._core = None
         self._sr = 0.0
+        self.ResetLoudness()
         self.Status = "сброшено"
 
     def Samplerate(self):
@@ -156,6 +160,8 @@ class Wedoaudio:
             problems.append("включён внешний tox — компонент непереносим")
         if self.Samplerate() <= 0:
             problems.append("частота дискретизации нулевая")
+        if c.op("wedoaudio_loudness") is None:
+            problems.append("нет модуля громкости wedoaudio_loudness")
 
         # Геометрия спектра — часть контракта с ядром. Ядро переводит герцы в
         # номер бина линейно; логарифмическая ось или подъём верхов означают,
@@ -209,7 +215,33 @@ class Wedoaudio:
         self.Status = "самопроверка пройдена" if not problems else "замечаний: %d" % len(problems)
         return (not problems), problems
 
+    def Loudness(self):
+        """Громкость по ITU-R BS.1770-4 одним словарём: momentary, shortterm,
+        integrated (LUFS), lra (LU), truepeak, truepeak_max (dBTP).
+
+        Значение, которое ещё нельзя измерить, равно None: мгновенной нужны
+        400 мс звука, кратковременной 3 с, интегральной хотя бы один блок выше
+        -70 LUFS. В канале CHOP вместо None стоит -100 - там нужно число."""
+        m = getattr(self, "_loud", None)
+        if m is None:
+            return dict.fromkeys(("momentary", "shortterm", "integrated", "lra",
+                                  "truepeak", "truepeak_max"))
+        return m.read()
+
+    def ResetLoudness(self):
+        """Начать интегральную громкость и диапазон заново: граница трека или сета."""
+        self._loud = None
+        self._loud_key = None
+
     # ---- внутреннее ------------------------------------------------------
+    def loud(self, sr, channels, truepeak):
+        key = (float(sr), int(channels), bool(truepeak))
+        if getattr(self, "_loud", None) is None or self._loud_key != key:
+            mod = self.comp.op("wedoaudio_loudness").module
+            self._loud = mod.LoudnessMeter(sr, channels, truepeak=truepeak)
+            self._loud_key = key
+        return self._loud
+
     def _dsp(self):
         return self.comp.op("wedoaudio_dsp").module
 
@@ -228,9 +260,67 @@ ANALYZE = '''
 Ошибки НЕ глотаются: любая записывается в параметр Status, иначе компонент
 молча перестаёт считать и выглядит как тишина. Это уже случалось."""
 
+import time
 import numpy as np
 
 _S = {"tick": 0}
+
+
+LOUD_ROWS = (("momentary", "lufsm"), ("shortterm", "lufss"), ("integrated", "lufsi"),
+             ("lra", "lra"), ("truepeak", "truepeak"), ("truepeak_max", "truepeakmax"))
+NOT_MEASURED = -100.0       # в канале CHOP нужно число; None живёт в ext.Loudness()
+
+
+def loud_rows(comp, reading):
+    """Строки громкости дописываются ПОСЛЕ 22 базовых, и только при включённом
+    тумблере: с выключенным шина остаётся ровно той, что была до 4.3."""
+    if not int(comp.par.Loudness.eval()):
+        return []
+    return [[name, NOT_MEASURED if reading.get(key) is None else float(reading[key])]
+            for key, name in LOUD_ROWS]
+
+
+def feed_loudness(comp, ext):
+    """Громкость меряется по СЭМПЛАМ, поэтому кормится каждый кадр, мимо Rate:
+    пропущенный кадр здесь это не «реже считаем», а выпавшие из суммы сэмплы.
+    Вход запрашивается каждый кадр, чтобы срезы времени шли встык."""
+    if not int(comp.par.Loudness.eval()):
+        ext.ResetLoudness()
+        _S["loud_note"] = ""
+        return
+    now = time.perf_counter()             # до кука: это время начала кадра, конец среза
+    src = comp.op("in_audio")
+    src.cook(force=True)
+    if not src.numChans or not src.numSamples:
+        return
+    a = src.numpyArray()
+    ch = min(int(a.shape[0]), 2)          # проверены моно и стерео; остальное не заявляем
+    meter = ext.loud(float(src.rate), ch, bool(int(comp.par.Truepeak.eval())))
+    meter.process(a[:ch])
+
+    # СТОРОЖ ПОТЕРИ СЭМПЛОВ. Сколько отсчётов пришло против того, сколько должно было
+    # прийти за это время. Потерянный звук иначе не виден вовсе: громкость останется
+    # правдоподобной, просто окна 400 мс и 3 с тихо растянутся.
+    # Часы - НАСТЕННЫЕ, и это принципиально. Замерено в 2025.32460: срезы звука идут
+    # точно по absTime (остаток ноль отсчётов), поэтому сверка с absTime не может
+    # найти ничего - TouchDesigner ограничивает срез 0.2 с, и при кадре длиннее звук
+    # за остаток выпадает ВМЕСТЕ с его временем: заминка 0.4 с дала срез 8820 отсчётов
+    # и сдвиг absTime на те же 0.2 с. По своим часам TD ничего не терял. Вдобавок в
+    # onFrameStart после заминки absTime ещё старый, а срез уже полный: первая версия
+    # сторожа на этом ложно сообщала о 2.3% потерь при загрузке компонента.
+    # Оценка идёт по двум окнам сразу (10 с): заминка на границе окна даёт недобор
+    # в одном окне и перебор в соседнем, на сдвоенном промежутке они гасятся.
+    marks = _S.get("loud_marks")
+    if marks is None or _S.get("loud_meter") is not meter:
+        _S["loud_marks"], _S["loud_meter"] = [(now, meter.samples)], meter
+        _S["loud_note"] = ""
+    elif now - marks[-1][0] >= 5.0:
+        marks.append((now, meter.samples))
+        del marks[:-3]
+        t_a, n_a = marks[0]
+        want = (now - t_a) * float(src.rate)
+        lost = 1.0 - (meter.samples - n_a) / want if want > 0 else 0.0
+        _S["loud_note"] = (" · громкость: потеряно %.1f%% сэмплов" % (lost * 100.0)) if lost > 0.02 else ""
 
 
 def clear_input(comp):
@@ -241,16 +331,26 @@ def clear_input(comp):
     for name in names:
         table.appendRow([name, 1.0 if name in ("agcgain", "silence") else 0.0])
     comp.ext.Wedoaudio.Reset()
+    for row in loud_rows(comp, {}):
+        table.appendRow(row)
 
 
 def onFrameStart(frame):
     comp = me.parent()
+    ext = comp.ext.Wedoaudio
+    try:
+        feed_loudness(comp, ext)
+    except Exception as e:
+        # В примечание, а не в Status напрямую: основной путь ниже в этом же кадре
+        # перезапишет Status словом "работает", и ошибка громкости станет невидимой.
+        _S["loud_note"] = " · ошибка громкости: %s" % e
+        debug("[WEDOAUDIO loudness]", e)
+
     _S["tick"] += 1
     every = max(1, int(comp.par.Rate.eval()))
     if _S["tick"] % every:
         return
 
-    ext = comp.ext.Wedoaudio
     try:
         # This Execute DAT is a side-effect consumer rather than a wired CHOP.
         # Prime the declared input chain before inspecting cached channel counts.
@@ -298,7 +398,10 @@ def onFrameStart(frame):
         tbl.clear()
         for k, v in feat.items():
             tbl.appendRow([k, float(v)])
-        ext.Status = "работает · %.0f Гц · %d признаков" % (sr, len(feat))
+        loud = loud_rows(comp, ext.Loudness())
+        for row in loud:
+            tbl.appendRow(row)
+        ext.Status = "работает · %.0f Гц · %d признаков%s" % (sr, len(feat) + len(loud), _S.get("loud_note", ""))
     except Exception as e:
         clear_input(comp)
         ext.Status = "ошибка: %s" % e
@@ -315,15 +418,20 @@ ONPULSE = '''
 def onPulse(par):
     if par.name == "Resetstate":
         par.owner.ext.Wedoaudio.Reset()
+    elif par.name == "Resetloudness":
+        par.owner.ext.Wedoaudio.ResetLoudness()
 '''
 
-AGENTS = """# WEDOAUDIO 4.2.2-rc1
+AGENTS = """# WEDOAUDIO 4.3.0
 
 Анализатор звука для TouchDesigner. Самодостаточен: ни одной ссылки наружу.
 
 ## Как пользоваться
 - вход: подключите аудио-CHOP ко входу компонента (моно сведётся само);
-- выходы: `out_features` (CHOP, 22+ именованных канала), `out_spectrum` (TOP);
+- выходы: `out_features` (CHOP: 22 базовых канала, с громкостью 28), `out_spectrum` (TOP);
+- громкость: `lufsm`, `lufss`, `lufsi` (LUFS), `lra` (LU), `truepeak`, `truepeakmax` (dBTP) —
+  ITU-R BS.1770-4 по сэмплам стереовхода, до сведения в моно. `-100` значит «не измерено»:
+  мгновенной нужны 400 мс, кратковременной 3 с. Тумблер `Loudness` выключает блок целиком;
 - настройки: одна страница `WEDOAUDIO`, у каждого параметра есть подсказка;
 - `Samplerate = 0` означает «взять частоту у входа» — так и оставьте.
 
@@ -331,7 +439,9 @@ AGENTS = """# WEDOAUDIO 4.2.2-rc1
 - `op('WEDOAUDIO').Reset()` — сбросить состояние при смене источника;
 - `op('WEDOAUDIO').Selftest()` — вернуть `(ok, список замечаний)`;
 - `op('WEDOAUDIO').Cfg()` — текущие настройки одним словарём;
-- `op('WEDOAUDIO').Samplerate()` — действующая частота дискретизации.
+- `op('WEDOAUDIO').Samplerate()` — действующая частота дискретизации;
+- `op('WEDOAUDIO').Loudness()` — громкость словарём, неизмеренное равно `None`;
+- `op('WEDOAUDIO').ResetLoudness()` — начать интегральную заново (граница трека).
 
 ## Чего не делать
 - не включать `enableexternaltox`: внешний тох — это ссылка, а не содержимое;
@@ -390,7 +500,7 @@ def build():
 
     # --- страница параметров: один порядок — порядок сигнала -----------------
     pg = c.appendCustomPage("WEDOAUDIO")
-    par_set(pg.appendStr("Version", label="Version"), "4.2.2-rc1",
+    par_set(pg.appendStr("Version", label="Version"), "4.3.0",
             "Версия ядра и разводки компонента.")
     c.par.Version.readOnly = True
     par_set(pg.appendStr("Status", label="Status"), "ожидание звука",
@@ -467,6 +577,16 @@ def build():
             "Темп автокорреляцией новизны. Выключить — вернуть счёт по интервалам.")
     par_set(pg.appendToggle("Tempofix", label="Fix tempo octave"), True,
             "Подтягивать явные удвоения и половины темпа к основному.")
+    par_set(pg.appendToggle("Loudness", label="Loudness BS.1770 (adds 6 channels)"), True,
+            "Громкость по ITU-R BS.1770-4 на сэмплах: мгновенная, кратковременная, интегральная, "
+            "диапазон и истинный пик. Добавляет шесть каналов ПОСЛЕ базовых 22. "
+            "Выключить — шина остаётся ровно прежней. Значение -100 означает «не измерено».")
+    par_set(pg.appendToggle("Truepeak", label="True Peak (8x oversampling)"), True,
+            "Истинный пик между отсчётами. Стоит около трети цены громкости; "
+            "выключить, если нужна только громкость.")
+    pg.appendPulse("Resetloudness", label="Reset Integrated Loudness")
+    c.par.Resetloudness.help = ("Начать интегральную громкость и диапазон заново. "
+                                "Жать на границе трека: интегральная копится с момента сброса.")
     pg.appendPulse("Resetstate", label="Reset")
     c.par.Resetstate.help = "Сбросить состояние анализатора. Жать при смене источника."
 
@@ -506,6 +626,10 @@ def build():
     dsp.text = CORE
     dsp.color = (0.11, 0.12, 0.125)
 
+    ld = c.create(T("textDAT"), "wedoaudio_loudness"); ld.nodeX, ld.nodeY = -360, 180
+    ld.text = LOUD
+    ld.color = (0.11, 0.12, 0.125)
+
     tbl = c.create(T("tableDAT"), "features_table"); tbl.nodeX, tbl.nodeY = -200, 0
     d2c = c.create(T("dattoCHOP"), "features_chop"); d2c.nodeX, d2c.nodeY = -40, 0
     d2c.par.dat = "features_table"
@@ -533,7 +657,7 @@ def build():
     pe = c.create(T("parameterexecuteDAT"), "on_reset"); pe.nodeX, pe.nodeY = -40, 180
     pe.text = ONPULSE
     pe.par.op = ".."
-    pe.par.pars = "Resetstate"
+    pe.par.pars = "Resetstate Resetloudness"
     # у parexec параметр называется onpulse, а не pulse: на 'pulse' сборка
     # падает с "ParCollection object has no attribute", и без явного custom
     # DAT слушает только встроенные параметры, а Resetstate — свой.
