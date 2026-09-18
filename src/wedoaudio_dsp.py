@@ -187,8 +187,10 @@ class OnsetState:
         self.buf = []
         self.last_t = -9.0
         self.env = 0.0
+        self.spread = 0.0       # 4.3.1: weight of the band's own jitter in the threshold; 0 = the 4.3.0 threshold exactly
+        self.jbuf = []          # recent |signed relative change| of the band, ~1.4 s
 
-    def step(self, novelty, t, dt, level=1.0, floor=0.0, decay_s=0.12):
+    def step(self, novelty, t, dt, level=1.0, floor=0.0, decay_s=0.12, jitter=None):
         # level/floor: absolute gate so the adaptive threshold can't fire on an
         # AGC-amplified noise floor (the proven web 'kickFloor' guard). The onset
         # needs BOTH a novelty spike AND the band to actually be loud enough.
@@ -197,6 +199,18 @@ class OnsetState:
             self.buf.pop(0)
         med = float(np.median(self.buf)) if self.buf else 0.0
         thr = med * self.k + self.delta
+        if self.spread > 0.0 and jitter is not None:
+            # 4.3.1 — false kicks on material with no drums (measured 2.0 per second on 96 field recordings: wind, rain,
+            # engines, sea). Novelty is a RECTIFIED rise, so on noise half the frames read zero, the median sits at ~0 and
+            # the threshold collapses to the bare delta, while the rises themselves reach 1.0-1.15 -- the size of a real
+            # kick over a held bass. The rectified series cannot tell the two apart; the SIGNED change can. Noise moves the
+            # band up and down by tens of percent every frame; a drum track is nearly still between hits. The median of
+            # |change| is that stillness, robust to the hits themselves because they are a few frames in eighty.
+            self.jbuf.append(abs(jitter))
+            if len(self.jbuf) > 2 * self.hist:
+                self.jbuf.pop(0)
+            if len(self.jbuf) > 8:
+                thr += self.spread * float(np.median(self.jbuf))
         raw = 0
         if novelty > thr and level > floor and (t - self.last_t) > self.refr:
             raw = 1
@@ -382,6 +396,8 @@ class WedoAudio:
             self.kick.k, self.kick.delta, self.kick.refr = 1.5, 0.015, 0.12
             self.snare.k, self.snare.delta, self.snare.refr = 1.6, 0.02, 0.09
             self.beat.k, self.beat.delta, self.beat.refr = 1.7, 0.02, 0.10
+        # 4.3.1 jitter-aware threshold, kick only (the measured defect); cfg kick_spread=0 restores 4.3.0 exactly
+        self.kick.spread = float(c.get('kick_spread', 3.0)) if rel else 0.0
         if 'kick_k'   in c: self.kick.k = c['kick_k']
         if 'kick_refr' in c: self.kick.refr = c['kick_refr']
         if 'snare_k'  in c: self.snare.k = c['snare_k']
@@ -391,7 +407,9 @@ class WedoAudio:
         dec = c.get('decay', 0.12)
         k_floor = c.get('kick_floor', 0.40 if rel else 0.22)
         s_floor = c.get('snare_floor', 0.35)
-        rk, kick_env, _ = self.kick.step(kf, t, dt, level=kick_level, floor=k_floor, decay_s=dec)
+        kick_prev = 0.0 if self.prev is None else band_peak(self.prev, sr, k_lo, k_hi) * g
+        kick_jitter = (kick_band - kick_prev) / max(0.05, self.kick_ref)
+        rk, kick_env, _ = self.kick.step(kf, t, dt, level=kick_level, floor=k_floor, decay_s=dec, jitter=kick_jitter)
         rs, snare_env, _ = self.snare.step(sf, t, dt, level=snare_level, floor=s_floor, decay_s=dec)
         rb, beat_env, _ = self.beat.step(bflux, t, dt, level=(0.0 if rel and self.silent else min(1.0, rms * g)), floor=c.get('beat_floor', 0.10), decay_s=dec)
 
