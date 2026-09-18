@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 # графики отчётов лежат в репозитории: на них ссылаются FORMAT_REPORT.md
 # и README, иначе на GitHub вместо картинок будут битые ссылки
+
+# Local audit fixtures, recordings and private runtime snapshots
+_audit/

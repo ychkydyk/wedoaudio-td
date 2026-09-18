@@ -55,7 +55,7 @@ class Wedoaudio:
         self.comp = ownerComp
         self._core = None
         self._sr = 0.0
-        self.Version = "4.2.2"
+        self.Version = "4.3.0"
         self.Status = "ожидание звука"
 
     # ---- Status держится в параметре, а не в поле объекта --------------------
@@ -149,6 +149,9 @@ class Wedoaudio:
             # иначе он честно отстаёт на кадр, и проверка ругается на исправный
             # компонент сразу после сборки.
             problems.append("анализ идёт, но out_features отдаёт %d каналов" % out.numChans)
+        mono = c.op("to_mono")
+        if mono is not None and mono.par.chanop.eval() != "avg":
+            problems.append("стерео не сводится в моно: to_mono.chanop должен быть avg")
         if c.par.enableexternaltox.eval():
             problems.append("включён внешний tox — компонент непереносим")
         if self.Samplerate() <= 0:
@@ -199,7 +202,7 @@ class Wedoaudio:
             problems.append("сетевые узлы внутри компонента: %s" % ", ".join(net))
 
         zero = [p.name for p in c.customPars
-                if p.style in ("Float", "Int") and p.default == 0 and p.eval() != 0]
+                if p.style in ("Float", "Int") and p.name != "Samplerate" and p.default == 0 and p.eval() != 0]
         if zero:
             problems.append("умолчание 0 при рабочем значении: %s" % ", ".join(zero))
 
@@ -230,6 +233,16 @@ import numpy as np
 _S = {"tick": 0}
 
 
+def clear_input(comp):
+    """A disconnected input must not keep publishing the previous loud frame."""
+    names = "rms bass mid high centroid flatness rolloff flux kick rawkick kickband snare rawsnare snareband beat rawbeat bpm beatphase transient sustain agcgain silence".split()
+    table = comp.op("features_table")
+    table.clear()
+    for name in names:
+        table.appendRow([name, 1.0 if name in ("agcgain", "silence") else 0.0])
+    comp.ext.Wedoaudio.Reset()
+
+
 def onFrameStart(frame):
     comp = me.parent()
     _S["tick"] += 1
@@ -239,13 +252,25 @@ def onFrameStart(frame):
 
     ext = comp.ext.Wedoaudio
     try:
+        # This Execute DAT is a side-effect consumer rather than a wired CHOP.
+        # Prime the declared input chain before inspecting cached channel counts.
+        for source in comp.inputs:
+            source.cook(force=True)
+        comp.op("in_audio").cook(force=True)
+        comp.op("to_mono").cook(force=True)
         spec = comp.op("spectrum_raw")
+        if spec is not None:
+            # Execute DAT is the consumer: request the current spectrum BEFORE
+            # reading cached channel metadata, including the first connected frame.
+            spec.cook(force=True)
         if not spec or not spec.numChans:
+            clear_input(comp)
             ext.Status = "нет спектра — подключите звук ко входу"
             return
         mag = np.array(spec.chans()[0].vals, dtype=float)
 
         lvl = comp.op("level_named")
+        if lvl is not None: lvl.cook(force=True)
         rms = float(lvl["rms"]) if (lvl and lvl.numChans) else 0.0
 
         sr = ext.Samplerate()
@@ -275,6 +300,7 @@ def onFrameStart(frame):
             tbl.appendRow([k, float(v)])
         ext.Status = "работает · %.0f Гц · %d признаков" % (sr, len(feat))
     except Exception as e:
+        clear_input(comp)
         ext.Status = "ошибка: %s" % e
         debug("[WEDOAUDIO]", e)
 '''
@@ -291,7 +317,7 @@ def onPulse(par):
         par.owner.ext.Wedoaudio.Reset()
 '''
 
-AGENTS = """# WEDOAUDIO 4.2.1
+AGENTS = """# WEDOAUDIO 4.2.2-rc1
 
 Анализатор звука для TouchDesigner. Самодостаточен: ни одной ссылки наружу.
 
@@ -317,6 +343,22 @@ AGENTS = """# WEDOAUDIO 4.2.1
 """
 
 
+PARAM_RANGES = {
+    'Samplerate': (0, 192000, 0, None), 'Rate': (1, 8, 1, 120),
+    'Inputgate': (0, .1, 0, 1), 'Agctarget': (.05, 1, .001, 1),
+    'Agcmaxgain': (1, 24, 1, 128),
+    'Bassmaxhz': (40, 500, 1, None), 'Midmaxhz': (500, 6000, 1, None),
+    'Highmaxhz': (4000, 24000, 1, None),
+    'Bassgain': (0, 4, 0, 32), 'Midgain': (0, 4, 0, 32), 'Highgain': (0, 4, 0, 32),
+    'Kickbandlo': (20, 200, 1, None), 'Kickbandhi': (40, 500, 1, None),
+    'Snarebandlo': (200, 4000, 1, None), 'Snarebandhi': (2000, 16000, 1, None),
+    'Kickfloor': (0, 1, 0, 2), 'Snarefloor': (0, 1, 0, 2), 'Beatfloor': (0, 1, 0, 1),
+    'Kicksensitivity': (.5, 4, .1, 10), 'Snaresensitivity': (.5, 4, .1, 10), 'Beatsensitivity': (.5, 4, .1, 10),
+    'Kickrefractoryms': (0, 500, 0, 5000), 'Snarerefractoryms': (0, 500, 0, 5000), 'Beatrefractoryms': (0, 500, 0, 5000),
+    'Kickguard': (0, .2, 0, 1), 'Snareguard': (0, .2, 0, 1), 'Smoothing': (0, 1, 0, 4),
+}
+
+
 def par_set(res, default=None, help=None):
     """appendFloat(...)[0].default = X задаёт УМОЛЧАНИЕ, но не значение:
     свежесозданный параметр остаётся нулём. Нуль в Samplerate — это нулевая
@@ -325,6 +367,12 @@ def par_set(res, default=None, help=None):
     if default is not None:
         p.default = default
         p.val = default
+    if p.name in PARAM_RANGES:
+        lo, hi, minimum, maximum = PARAM_RANGES[p.name]
+        p.normMin, p.normMax = lo, hi
+        p.min, p.clampMin = minimum, True
+        if maximum is not None:
+            p.max, p.clampMax = maximum, True
     if help:
         p.help = help
     return p
@@ -342,7 +390,7 @@ def build():
 
     # --- страница параметров: один порядок — порядок сигнала -----------------
     pg = c.appendCustomPage("WEDOAUDIO")
-    par_set(pg.appendStr("Version", label="Version"), "4.2.1",
+    par_set(pg.appendStr("Version", label="Version"), "4.2.2-rc1",
             "Версия ядра и разводки компонента.")
     c.par.Version.readOnly = True
     par_set(pg.appendStr("Status", label="Status"), "ожидание звука",
@@ -354,7 +402,7 @@ def build():
             "что вход врёт: на 48 кГц при заданных 44100 все полосы уезжают на 8.8%.")
     par_set(pg.appendInt("Rate", label="Analyse Every N Frames"), 1,
             "Считать не каждый кадр, а каждый N-й. Экономит кадр на слабой машине; "
-            "dt пересчитывается, темп не врёт.")
+            "Часы учитываются; история накапливается дольше. После смены Rate рекомендуется Reset.")
     par_set(pg.appendFloat("Inputgate", label="Input Gate (RMS)"), 0.001,
             "Ниже этого RMS вход считается тишиной и детекторы гасятся.")
 
@@ -393,17 +441,17 @@ def build():
             "То же для снейра.")
     par_set(pg.appendFloat("Beatfloor", label="Beat Floor"), 0.10,
             "То же для общей доли.")
-    par_set(pg.appendFloat("Kicksensitivity", label="Kick Sensitivity"), 1.6,
+    par_set(pg.appendFloat("Kicksensitivity", label="Kick Sensitivity"), 1.5,
             "Во сколько раз всплеск должен превысить недавний фон. Меньше — чувствительнее.")
     par_set(pg.appendFloat("Snaresensitivity", label="Snare Sensitivity"), 1.6,
             "То же для снейра.")
-    par_set(pg.appendFloat("Beatsensitivity", label="Beat Sensitivity"), 1.6,
+    par_set(pg.appendFloat("Beatsensitivity", label="Beat Sensitivity"), 1.7,
             "То же для доли.")
-    par_set(pg.appendFloat("Kickrefractoryms", label="Kick Refractory (ms)"), 110,
+    par_set(pg.appendFloat("Kickrefractoryms", label="Kick Refractory (ms)"), 200,
             "Сколько миллисекунд после удара новый не засчитывается.")
-    par_set(pg.appendFloat("Snarerefractoryms", label="Snare Refractory (ms)"), 110,
+    par_set(pg.appendFloat("Snarerefractoryms", label="Snare Refractory (ms)"), 90,
             "То же для снейра.")
-    par_set(pg.appendFloat("Beatrefractoryms", label="Beat Refractory (ms)"), 110,
+    par_set(pg.appendFloat("Beatrefractoryms", label="Beat Refractory (ms)"), 100,
             "То же для доли.")
     par_set(pg.appendFloat("Kickguard", label="Kick Absolute Guard"), 0.05,
             "Небольшой абсолютный порог поверх относительного: отсекает срабатывания "
@@ -414,7 +462,7 @@ def build():
     par_set(pg.appendFloat("Smoothing", label="Envelope Smoothing"), 0.08,
             "Насколько медленно спадает огибающая. Больше — плавнее и вязче.")
     par_set(pg.appendToggle("Onsetrel", label="Onsets 4.2.1 (off = 4.2.0)"), True,
-            "Относительные онсеты 4.2.1. Выключить — вернуть поведение 4.2.0 в точности.")
+            "Относительные онсеты 4.2.1. Выключить — выбрать legacy-настройки onset; это не откат всего анализатора темпа.")
     par_set(pg.appendToggle("Tempoac", label="Tempo by autocorrelation"), True,
             "Темп автокорреляцией новизны. Выключить — вернуть счёт по интервалам.")
     par_set(pg.appendToggle("Tempofix", label="Fix tempo octave"), True,
@@ -427,7 +475,7 @@ def build():
     # сведение в моно ДО анализа: стерео давало chan1/chan2, и чтение "первого
     # канала" тихо означало бы "только левый". Один канал — одна правда.
     mono = c.create(T("mathCHOP"), "to_mono");      mono.nodeX, mono.nodeY = -600, 0
-    mono.par.chopop = "average"
+    mono.par.chanop = "avg"
     mono.inputConnectors[0].connect(ai)
 
     lvl = c.create(T("analyzeCHOP"), "level");      lvl.nodeX, lvl.nodeY = -450, -140
@@ -550,6 +598,6 @@ except Exception as e:
 # в старой открывается с предупреждением или не открывается вовсе, а по имени
 # файла это не видно — поэтому сборка пишется в имя, а не в примечание.
 build = getattr(app, "build", "unknown")
-out_path = os.path.join(REPO, "WEDOAUDIO_4.2.2_TD%s.tox" % build)
+out_path = os.path.join(REPO, "WEDOAUDIO_4.3.0_TD%s.tox" % build)
 comp.save(out_path)
 print("сохранён тох:", out_path, "· сборка TD:", build)

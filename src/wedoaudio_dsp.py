@@ -280,6 +280,10 @@ class WedoAudio:
         c = cfg or {}
         gate = c.get('gate', 0.001)
         mag = np.asarray(mag, dtype=float)
+        if mag.ndim != 1 or not np.isfinite(mag).all() or (mag < 0).any():
+            raise ValueError("mag must be a finite, non-negative 1D magnitude spectrum")
+        if not all(np.isfinite(v) for v in (rms, t, dt, self.sr)) or rms < 0 or dt <= 0 or self.sr <= 0:
+            raise ValueError("rms/time/dt/sample rate must be finite; rms >= 0, dt and rate > 0")
         sr = self.sr
         self.silent = 1 if rms < gate else 0
 
@@ -367,7 +371,13 @@ class WedoAudio:
         # onset internals (k / refractory) tunable; floors default to the verified
         # values (kick 0.22 / snare 0.35 / beat 0.10 — snare gate rejects AGC-lifted
         # hats). decay = onset envelope release (LED fade time).
-        if not rel:
+        if rel:
+            # Re-apply the selected mode before explicit UI overrides. Otherwise
+            # switching legacy -> relative leaves the legacy thresholds latched.
+            self.kick.k, self.kick.delta, self.kick.refr = 1.5, 0.40, 0.20
+            self.snare.k, self.snare.delta, self.snare.refr = 1.6, 0.50, 0.09
+            self.beat.k, self.beat.delta, self.beat.refr = 1.7, 0.40, 0.10
+        else:
             # exact 4.3 detector constants, so onset_rel=0 is a true rollback
             self.kick.k, self.kick.delta, self.kick.refr = 1.5, 0.015, 0.12
             self.snare.k, self.snare.delta, self.snare.refr = 1.6, 0.02, 0.09
@@ -383,7 +393,7 @@ class WedoAudio:
         s_floor = c.get('snare_floor', 0.35)
         rk, kick_env, _ = self.kick.step(kf, t, dt, level=kick_level, floor=k_floor, decay_s=dec)
         rs, snare_env, _ = self.snare.step(sf, t, dt, level=snare_level, floor=s_floor, decay_s=dec)
-        rb, beat_env, _ = self.beat.step(bflux, t, dt, level=min(1.0, rms * g), floor=c.get('beat_floor', 0.10), decay_s=dec)
+        rb, beat_env, _ = self.beat.step(bflux, t, dt, level=(0.0 if rel and self.silent else min(1.0, rms * g)), floor=c.get('beat_floor', 0.10), decay_s=dec)
 
         # tempo via inter-onset intervals from a SINGLE anchor: kick preferred
         # (most reliable in 4-on-floor); fall back to broadband beat only after
@@ -436,7 +446,7 @@ class WedoAudio:
             est = tempo_autocorr(self.nov_hist, dt)
             if est > 0:
                 self.bpm_ac = est if self.bpm_ac <= 0 else self.bpm_ac * 0.6 + est * 0.4
-        if self.bpm_ac > 0:
+        if c.get('tempo_ac', 1) and self.bpm_ac > 0:
             self.bpm = self.bpm_ac
         elif c.get('tempo_fix', 1) and len(self.nov_hist) >= 60:
             self.bpm, _ = tempo_multiple_fix(self.bpm_raw, self.nov_hist, dt)

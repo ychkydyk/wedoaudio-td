@@ -1,0 +1,159 @@
+{
+  "version": "4.2.2-rc1",
+  "published": false,
+  "tdBuild": "2025.32460",
+  "upstreamBase": "8e84c999e8fbcc9c4efdd4a867867a4584cdb48a",
+  "channels": 22,
+  "files": [
+    {
+      "path": "WEDOAUDIO_4.2.2-rc1_TD2025.32460.tox",
+      "bytes": 17086,
+      "sha256": "efbe9649bfa9c659209a4f8dbc2b5e6cac3224f9fba52f1c925dcdb1bba7c72a"
+    },
+    {
+      "path": "README.md",
+      "bytes": 21287,
+      "sha256": "41ba9391f2200b25affcbafe9fb80fc75645a32b2a2017f5e548250bdac8cd88"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 14829,
+      "sha256": "36801f5e30567d7c330c775c528cad0c3670b71d89de720c675db5a6cd9d2bd9"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "bytes": 9547,
+      "sha256": "c4595c671517d199987c441792ccbda0e1959dda36974dea867c7614003dfcf4"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 494,
+      "sha256": "8db986a5c9e11f7634afbc1589600f9b13348046d3e70a27e35bd1bc4290f8a0"
+    },
+    {
+      "path": "VERIFICATION.md",
+      "bytes": 2210,
+      "sha256": "7a673e512cd2005ebad5921fefdd98aa2c361903c75855219de589f267e5b633"
+    },
+    {
+      "path": "FORMAT_REPORT.md",
+      "bytes": 10861,
+      "sha256": "9db37e6332cbcb9a0dcf10a07354b685bb575bb7c05b2a2587bc1e9717bac040"
+    },
+    {
+      "path": "tools/build_portable.py",
+      "bytes": 34826,
+      "sha256": "bebc5c7d438868df0f69bf23dcc956d0416a7bed3e1f37dce576d13d690f6739"
+    },
+    {
+      "path": "img/parameters-4.2.2.png",
+      "bytes": 85555,
+      "sha256": "0d2e47eb937dcf46200584a1e207e28e1257dc23d9b9e1e33e652930d41c3ad4"
+    },
+    {
+      "path": "src/test_release_controls.py",
+      "bytes": 2704,
+      "sha256": "b84a1ab094df79a050aa012eb3c596881e5fa93ed517ceb62e4a7e17bb4e57ef"
+    },
+    {
+      "path": "src/wedoaudio_dsp.py",
+      "bytes": 25088,
+      "sha256": "395b6a82cd07cb3e879c536e17455c5f5849b80778d295650dcc5c68aac774d1"
+    },
+    {
+      "path": "src/wedoaudio_standalone_analyze.py",
+      "bytes": 3223,
+      "sha256": "f43939d1aabb29ce37ec8387ccd7c0904cbfbc759e33e1ba88cc092a90ca2cfe"
+    },
+    {
+      "path": "src/wedoaudio_timbre.py",
+      "bytes": 7875,
+      "sha256": "5f93b6c511a8e948491ac30b33076e2b60940e4d4161004b67ec67cb63c31f14"
+    },
+    {
+      "path": "src/_sweep.py",
+      "bytes": 2483,
+      "sha256": "2f321bc7cfb5915403acf710a65e37e2df6c0479a57614b51001d7888f379c03"
+    },
+    {
+      "path": "src/_wedoaudio_bench.py",
+      "bytes": 11265,
+      "sha256": "6d8ba3ce291353f7db6bfa74cc9264b28e2b3eb31e1314f04e2bcf502bd59e59"
+    },
+    {
+      "path": "src/_wedoaudio_formats.py",
+      "bytes": 15062,
+      "sha256": "152b6b0254bd0774654a1582f97026169f632695dbe3c9927e2067a8bc2c7163"
+    },
+    {
+      "path": "src/_wedoaudio_libtest.py",
+      "bytes": 8832,
+      "sha256": "e0df9f397ecb53650835f268c7fa9da3777d637f77166c14aba4ae414bf4867e"
+    },
+    {
+      "path": "src/_wedoaudio_realtest.py",
+      "bytes": 9950,
+      "sha256": "62e1ad9791b28f8f4bfdff0516f22e157fd73b33fb83722cbf763690d26d96ed"
+    },
+    {
+      "path": "src/_wedoaudio_test.py",
+      "bytes": 7432,
+      "sha256": "b112360a7cd2acb35a0c0f29d84fbed7ef267a8120c277688b84430d933f4dd9"
+    },
+    {
+      "path": "src/_wedoaudio_timbre_test.py",
+      "bytes": 4257,
+      "sha256": "1e2489c8e2c0978dcc47676da61b2f9186c11f67b7260a6bcb1740597b47e028"
+    },
+    {
+      "path": "report_img/01_onsets.png",
+      "bytes": 32200,
+      "sha256": "a977a9ca39f4b809e68d48c90dbe50dcad890221b05cef3d15c08e86c4a0e8bf"
+    },
+    {
+      "path": "report_img/02_tempo.png",
+      "bytes": 28837,
+      "sha256": "dc1bd179d9dc549dd3ad7ca29cf67402455bf33b98d3b2e7f3560671ae0280c4"
+    },
+    {
+      "path": "report_img/03_defects.png",
+      "bytes": 37358,
+      "sha256": "144474ac40836cba8dee96f7f2fc74dc4de732edee2e621f3daceca65bdc3adc"
+    },
+    {
+      "path": "report_img/f01b_unstable.png",
+      "bytes": 41493,
+      "sha256": "4c09497f2892d86d8b3fccaedb44dd7352a31b4018bb4fb15be1bc326c43dd42"
+    },
+    {
+      "path": "report_img/f01_tempo_drift.png",
+      "bytes": 40041,
+      "sha256": "3dc28844ca6263b4de227e2e9144239677202c0ce1a5ebcb6a5b7e6ea066f72e"
+    },
+    {
+      "path": "report_img/f02_onset_match.png",
+      "bytes": 39233,
+      "sha256": "44ff7d712da0fa80e4c92e676ecb484afd0dcc7269fe93df975c5a7a490cddbe"
+    },
+    {
+      "path": "report_img/f03_false_hits.png",
+      "bytes": 47674,
+      "sha256": "974f9ba53c0617723209293dd944086f6f3878536e1720c1c9a9aeb755005903"
+    },
+    {
+      "path": "report_img/f04_vendor_label.png",
+      "bytes": 35184,
+      "sha256": "13df552d5cfccf8115ff7e0e05b449b021ccb5d427fa4ea937ea784e1433781c"
+    },
+    {
+      "path": "report_img/f05_live.png",
+      "bytes": 34386,
+      "sha256": "4c84b014eb80a392e096b90b281e1285aadab4f1e52bec3046696fe47746c2fc"
+    },
+    {
+      "path": "report_img/f06_spectrum_scale.png",
+      "bytes": 35747,
+      "sha256": "282516e9c4087f2ad79faf3eca065a40eabc7c9912f16caf49b39d51a3ac64da"
+    }
+  ]
+}
