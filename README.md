@@ -1,5 +1,7 @@
 # WEDOAUDIO 4.3.0 — анализатор звука для TouchDesigner
 
+**English:** [README.en.md](README.en.md) — same instrument, shorter text, same measured limitations.
+
 Один компонент считает **22 признака звука за кадр и громкость по ITU-R BS.1770-4 / EBU R128**
 и отдаёт их именованной шиной (CHOP) и спектр-текстурой (TOP). Ядро — чистый numpy, вшито внутрь компонента: ни плагинов, ни
 бинарников, ни установки чего-либо в систему.
